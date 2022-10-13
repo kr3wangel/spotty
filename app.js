@@ -7,20 +7,36 @@ import {
   MessageComponentTypes,
   ButtonStyleTypes,
 } from 'discord-interactions';
-import { VerifyDiscordRequest, getRandomEmoji, DiscordRequest } from './utils.js';
-import { getShuffledOptions, getResult } from './game.js';
+import {
+  VerifyDiscordRequest,
+  getRandomEmoji,
+  DiscordRequest
+} from './utils.js';
+import {
+  getShuffledOptions,
+  getResult
+} from './game.js';
 import {
   CHALLENGE_COMMAND,
   TEST_COMMAND,
+  ARTIST_COMMAND,
   HasGuildCommands,
 } from './commands.js';
+
+import {
+  Spotify
+} from './spotify.js';
+
+const spotify = new Spotify(process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CLIENT_SECRET);
 
 // Create an express app
 const app = express();
 // Get port, or default to 3000
 const PORT = process.env.PORT || 3000;
 // Parse request body and verifies incoming requests using discord-interactions package
-app.use(express.json({ verify: VerifyDiscordRequest(process.env.PUBLIC_KEY) }));
+app.use(express.json({
+  verify: VerifyDiscordRequest(process.env.PUBLIC_KEY)
+}));
 
 // Store for in-progress games. In production, you'd want to use a DB
 const activeGames = {};
@@ -30,65 +46,55 @@ const activeGames = {};
  */
 app.post('/interactions', async function (req, res) {
   // Interaction type and data
-  const { type, id, data } = req.body;
+  const {
+    type,
+    id,
+    data
+  } = req.body;
 
   /**
    * Handle verification requests
    */
   if (type === InteractionType.PING) {
-    return res.send({ type: InteractionResponseType.PONG });
+    return res.send({
+      type: InteractionResponseType.PONG
+    });
   }
 
   /**
    * Handle slash command requests
    * See https://discord.com/developers/docs/interactions/application-commands#slash-commands
    */
+
+  // This is a javascript-ish enum for commands
+  const COMMANDS = {
+    ARTIST: "artist",
+  }
+
   if (type === InteractionType.APPLICATION_COMMAND) {
-    const { name } = data;
+    const {
+      name
+    } = data;
 
-    // "test" guild command
-    if (name === 'test') {
-      // Send a message into the channel where command was triggered from
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          // Fetches a random emoji to send from a helper function
-          content: 'hello world ' + getRandomEmoji(),
-        },
-      });
-    }
-    // "challenge" guild command
-    if (name === 'challenge' && id) {
-      const userId = req.body.member.user.id;
-      // User's object choice
-      const objectName = req.body.data.options[0].value;
+    if (name === COMMANDS.ARTIST) {
+      const artistName = data.options.find(x => x.name === 'name')?.value;
 
-      // Create active game using message ID as the game ID
-      activeGames[id] = {
-        id: userId,
-        objectName,
-      };
+      if (!artistName) {
+        throw new Error('Artist is required');
+      }
+
+      const { artists } = await spotify.findArtist(artistName);
+
+      let content = '';
+      if (artists.items.length ) {
+        content = artists.items[0].external_urls.spotify;
+      }
 
       return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
-          // Fetches a random emoji to send from a helper function
-          content: `Rock papers scissors challenge from <@${userId}>`,
-          components: [
-            {
-              type: MessageComponentTypes.ACTION_ROW,
-              components: [
-                {
-                  type: MessageComponentTypes.BUTTON,
-                  // Append the game ID to use later on
-                  custom_id: `accept_button_${req.body.id}`,
-                  label: 'Accept',
-                  style: ButtonStyleTypes.PRIMARY,
-                },
-              ],
-            },
-          ],
-        },
+          content
+        }
       });
     }
   }
@@ -114,23 +120,21 @@ app.post('/interactions', async function (req, res) {
             content: 'What is your object of choice?',
             // Indicates it'll be an ephemeral message
             flags: InteractionResponseFlags.EPHEMERAL,
-            components: [
-              {
-                type: MessageComponentTypes.ACTION_ROW,
-                components: [
-                  {
-                    type: MessageComponentTypes.STRING_SELECT,
-                    // Append game ID
-                    custom_id: `select_choice_${gameId}`,
-                    options: getShuffledOptions(),
-                  },
-                ],
-              },
-            ],
+            components: [{
+              type: MessageComponentTypes.ACTION_ROW,
+              components: [{
+                type: MessageComponentTypes.STRING_SELECT,
+                // Append game ID
+                custom_id: `select_choice_${gameId}`,
+                options: getShuffledOptions(),
+              }, ],
+            }, ],
           },
         });
         // Delete previous message
-        await DiscordRequest(endpoint, { method: 'DELETE' });
+        await DiscordRequest(endpoint, {
+          method: 'DELETE'
+        });
       } catch (err) {
         console.error('Error sending message:', err);
       }
@@ -157,7 +161,9 @@ app.post('/interactions', async function (req, res) {
           // Send results
           await res.send({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: resultStr },
+            data: {
+              content: resultStr
+            },
           });
           // Update ephemeral message
           await DiscordRequest(endpoint, {
@@ -182,5 +188,6 @@ app.listen(PORT, () => {
   HasGuildCommands(process.env.APP_ID, process.env.GUILD_ID, [
     TEST_COMMAND,
     CHALLENGE_COMMAND,
+    ARTIST_COMMAND,
   ]);
 });

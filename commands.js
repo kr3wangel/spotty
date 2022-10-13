@@ -1,5 +1,10 @@
-import { getRPSChoices } from './game.js';
-import { capitalize, DiscordRequest } from './utils.js';
+import {
+  getRPSChoices
+} from './game.js';
+import {
+  capitalize,
+  DiscordRequest
+} from './utils.js';
 
 export async function HasGuildCommands(appId, guildId, commands) {
   if (guildId === '' || appId === '') return;
@@ -13,7 +18,9 @@ async function HasGuildCommand(appId, guildId, command) {
   const endpoint = `applications/${appId}/guilds/${guildId}/commands`;
 
   try {
-    const res = await DiscordRequest(endpoint, { method: 'GET' });
+    const res = await DiscordRequest(endpoint, {
+      method: 'GET'
+    });
     const data = await res.json();
 
     if (data) {
@@ -37,7 +44,10 @@ export async function InstallGuildCommand(appId, guildId, command) {
   const endpoint = `applications/${appId}/guilds/${guildId}/commands`;
   // install command
   try {
-    await DiscordRequest(endpoint, { method: 'POST', body: command });
+    await DiscordRequest(endpoint, {
+      method: 'POST',
+      body: command
+    });
   } catch (err) {
     console.error(err);
   }
@@ -69,14 +79,24 @@ export const TEST_COMMAND = {
 export const CHALLENGE_COMMAND = {
   name: 'challenge',
   description: 'Challenge to a match of rock paper scissors',
-  options: [
-    {
-      type: 3,
-      name: 'object',
-      description: 'Pick your object',
-      required: true,
-      choices: createCommandChoices(),
-    },
-  ],
+  options: [{
+    type: 3,
+    name: 'object',
+    description: 'Pick your object',
+    required: true,
+    choices: createCommandChoices(),
+  }, ],
+  type: 1,
+};
+
+export const ARTIST_COMMAND = {
+  name: 'artist',
+  description: 'Searches for artists on Spotify',
+  options: [{
+    type: 3,
+    name: 'name',
+    description: 'The name of the artist',
+    required: true,
+  }],
   type: 1,
 };
